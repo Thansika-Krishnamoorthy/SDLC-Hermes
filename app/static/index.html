@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SDLC Skill Runner</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="mark">SDLC</span>
+        <div>
+          <h1>Kovan SDLC</h1>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <label class="control">
+          <span>Skill</span>
+          <select id="skill-select"></select>
+        </label>
+
+        <div class="control project-control">
+          <span>Project</span>
+          <button type="button" id="project-toggle" class="select-like" aria-expanded="false">
+            <span id="project-label">Select project</span>
+          </button>
+          <div id="project-menu" class="dropdown" hidden>
+            <section class="picker-section">
+              <h3>Git repositories</h3>
+              <ul id="repo-list" class="picker-list"></ul>
+            </section>
+            <section class="picker-section">
+              <h3>Folders</h3>
+              <div class="dropdown-path">
+                <button type="button" id="up-btn" class="ghost">Up</button>
+                <code id="current-path"></code>
+              </div>
+              <ul id="folder-list" class="picker-list"></ul>
+              <button type="button" id="select-dir-btn">Use this folder</button>
+            </section>
+            <form id="create-form" class="create-row">
+              <input id="new-folder" type="text" placeholder="New folder name" required />
+              <button type="submit">Create</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="chat-stage">
+      <p class="error banner" id="setup-error" hidden></p>
+      <ol id="transcript" class="transcript"></ol>
+      <p class="empty" id="empty-state">Select a skill and project above, then describe the business need to start the interview.</p>
+
+      <aside class="brd-card" id="brd-card" hidden>
+        <div class="brd-head">
+          <h2>Business Requirements Document</h2>
+          <p id="brd-status"></p>
+        </div>
+        <div id="brd-preview" class="brd-preview"></div>
+        <div class="actions" id="brd-actions">
+          <button type="button" id="approve-btn">Approve BRD</button>
+          <button type="button" id="modify-btn" class="ghost">Modify BRD</button>
+          <button type="button" id="more-btn" class="ghost">Add requirements</button>
+        </div>
+        <p class="path-note" id="save-path"></p>
+      </aside>
+
+      <form id="chat-form" class="composer">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="Type a message"
+          autocomplete="off"
+        />
+        <button type="submit">Send</button>
+      </form>
+      <p class="error" id="chat-error" hidden></p>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
