@@ -1,6 +1,6 @@
 ---
 
-name: business-requirement-analysis
+name: Business Requirement Analysis
 description: Conduct a Business Requirement Analysis interview, remove business ambiguity, generate a Business Requirements Document (BRD), and wait for stakeholder approval before any technical SDLC stage begins.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

@@ -40,6 +40,19 @@ def brd_filename(feature_name: str) -> str:
     return f"BRD-{slugify_feature(feature_name)}.md"
 
 
+def preview_brd_path(
+    browse_root: Path,
+    project_root: Path,
+    markdown: str,
+    feature_name: str | None = None,
+) -> Path:
+    project = resolve_under_root(browse_root, project_root)
+    if not project.is_dir():
+        raise PathError(f"Project directory does not exist: {project}")
+    name = feature_name or feature_name_from_brd(markdown)
+    return project / "docs" / brd_filename(name)
+
+
 def save_brd(
     browse_root: Path,
     project_root: Path,

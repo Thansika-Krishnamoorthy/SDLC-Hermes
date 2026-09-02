@@ -1,3 +1,6 @@
+const STAGES = ["setup", "interview", "review", "done"];
+const DEFAULT_PLACEHOLDER = "Type a message";
+
 const state = {
   currentPath: "",
   selectedProject: "",
@@ -5,6 +8,8 @@ const state = {
   brdMarkdown: "",
   featureName: "",
   approved: false,
+  intendedSavePath: "",
+  mode: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +36,77 @@ async function api(path, options = {}) {
     throw new Error(detail);
   }
   return response.json();
+}
+
+function setStage(stage) {
+  const stepper = $("stage-stepper");
+  if (!stepper) return;
+  const activeIndex = STAGES.indexOf(stage);
+  stepper.querySelectorAll("li[data-stage]").forEach((li) => {
+    const idx = STAGES.indexOf(li.dataset.stage);
+    li.classList.toggle("is-active", li.dataset.stage === stage);
+    li.classList.toggle("is-complete", idx >= 0 && idx < activeIndex);
+  });
+}
+
+function setMode(mode) {
+  const banner = $("mode-banner");
+  const text = $("mode-banner-text");
+  if (mode === "modify") {
+    text.textContent = "Describe changes to the BRD below.";
+    $("chat-input").placeholder = "Describe the BRD change…";
+  } else if (mode === "add") {
+    text.textContent = "Describe the new requirement.";
+    $("chat-input").placeholder = "Describe the new requirement…";
+  }
+  banner.hidden = false;
+  state.mode = mode;
+  $("chat-input").focus();
+}
+
+function clearMode() {
+  const banner = $("mode-banner");
+  if (banner) banner.hidden = true;
+  state.mode = null;
+  $("chat-input").placeholder = DEFAULT_PLACEHOLDER;
+}
+
+function updateTranscriptCount() {
+  const summary = $("transcript-summary");
+  if (!summary) return;
+  const count = $("transcript").children.length;
+  summary.textContent = `Interview history (${count} message${count === 1 ? "" : "s"})`;
+}
+
+function scrollTranscriptToBottom() {
+  const panel = document.querySelector(".transcript-panel");
+  if (panel) panel.scrollTop = panel.scrollHeight;
+}
+
+function collapseStaleAssistantRounds() {
+  for (const item of $("transcript").querySelectorAll(".bubble.assistant")) {
+    if (item.querySelector(".round-collapsed")) continue;
+    if (item.querySelector(".round-stage")) {
+      collapseAssistantBubble(item, "Submitted answers");
+      continue;
+    }
+    const choices = item.querySelector(".choices");
+    if (!choices) continue;
+    const selected = choices.querySelector(".choice.selected");
+    const label = selected?.textContent?.trim();
+    collapseAssistantBubble(item, label ? `Answered: ${label}` : "Round completed");
+  }
+}
+
+function collapseAssistantBubble(item, summaryText) {
+  item.querySelectorAll(".choices, .round-stage, .round-progress").forEach((el) => el.remove());
+  let summary = item.querySelector(".round-collapsed");
+  if (!summary) {
+    summary = document.createElement("p");
+    summary.className = "round-collapsed";
+    item.appendChild(summary);
+  }
+  summary.textContent = summaryText;
 }
 
 function folderName(path) {
@@ -206,10 +282,45 @@ function inlineMarkdown(text) {
   return formatMarkdown(text);
 }
 
+function isTableRow(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("|") && trimmed.endsWith("|");
+}
+
+function isTableSeparator(line) {
+  if (!isTableRow(line)) return false;
+  return line.trim().slice(1, -1).split("|").every((cell) => /^[\s\-:]+$/.test(cell.trim()));
+}
+
+function parseTableCells(line) {
+  return line.trim().slice(1, -1).split("|").map((cell) => cell.trim());
+}
+
+function renderTable(tableLines) {
+  const rows = tableLines.filter((line) => !isTableSeparator(line)).map(parseTableCells);
+  if (!rows.length) return "";
+  const [header, ...body] = rows;
+  let html = '<div class="table-scroll"><table><thead><tr>';
+  for (const cell of header) {
+    html += `<th>${inlineMarkdown(cell)}</th>`;
+  }
+  html += "</tr></thead><tbody>";
+  for (const row of body) {
+    html += "<tr>";
+    for (const cell of row) {
+      html += `<td>${inlineMarkdown(cell)}</td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</tbody></table></div>";
+  return html;
+}
+
 function renderMarkdownDocument(text) {
   const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];
   let list = null;
+  let i = 0;
 
   function closeList() {
     if (!list) return;
@@ -217,13 +328,27 @@ function renderMarkdownDocument(text) {
     list = null;
   }
 
-  for (const raw of lines) {
+  while (i < lines.length) {
+    const raw = lines[i];
     const line = raw.trimEnd();
+
+    if (isTableRow(line)) {
+      closeList();
+      const tableLines = [];
+      while (i < lines.length && isTableRow(lines[i].trimEnd())) {
+        tableLines.push(lines[i].trimEnd());
+        i += 1;
+      }
+      html.push(renderTable(tableLines));
+      continue;
+    }
+
     const heading = line.match(/^(#{1,4})\s+(.+)$/);
     if (heading) {
       closeList();
       const level = heading[1].length;
       html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      i += 1;
       continue;
     }
     const ul = line.match(/^[-*]\s+(.+)$/);
@@ -234,6 +359,7 @@ function renderMarkdownDocument(text) {
         list = "ul";
       }
       html.push(`<li>${inlineMarkdown(ul[1])}</li>`);
+      i += 1;
       continue;
     }
     const ol = line.match(/^\d+\.\s+(.+)$/);
@@ -244,14 +370,17 @@ function renderMarkdownDocument(text) {
         list = "ol";
       }
       html.push(`<li>${inlineMarkdown(ol[1])}</li>`);
+      i += 1;
       continue;
     }
     if (!line.trim()) {
       closeList();
+      i += 1;
       continue;
     }
     closeList();
     html.push(`<p>${inlineMarkdown(line)}</p>`);
+    i += 1;
   }
   closeList();
   return html.join("");
@@ -277,7 +406,8 @@ function addBubble(role, text, display) {
     item.textContent = text;
   }
   $("transcript").appendChild(item);
-  item.scrollIntoView({ behavior: "smooth", block: "end" });
+  updateTranscriptCount();
+  scrollTranscriptToBottom();
   return item;
 }
 
@@ -347,6 +477,7 @@ function renderAssistant(item, text) {
         return;
       }
       const label = option.label.toLowerCase();
+      collapseAssistantBubble(item, `Answered: ${option.label}`);
       if (label.includes("approve")) {
         await completeApproval();
         return;
@@ -356,8 +487,7 @@ function renderAssistant(item, text) {
         return;
       }
       if (label.includes("modify")) {
-        $("chat-input").placeholder = "Describe the BRD change…";
-        $("chat-input").focus();
+        setMode("modify");
         return;
       }
       try {
@@ -381,6 +511,7 @@ function renderAssistant(item, text) {
     stage.querySelectorAll("button, input").forEach((el) => {
       el.disabled = true;
     });
+    collapseAssistantBubble(item, `Submitted ${round.questions.length} answers`);
     const items = [];
     const lines = ["Round answers:"];
     for (const question of round.questions) {
@@ -475,6 +606,10 @@ function hideBrd(status) {
   $("brd-preview").innerHTML = "";
   $("brd-status").textContent = "";
   $("save-path").textContent = "";
+  state.intendedSavePath = "";
+  $("chat-stage")?.classList.remove("review-mode");
+  const history = $("transcript-history");
+  if (history) history.setAttribute("open", "");
   if (status) $("brd-status").textContent = status;
 }
 
@@ -493,7 +628,24 @@ function stripBrdFromTranscript() {
   }
 }
 
-function showBrd(markdown, featureName) {
+async function loadBrdPreview() {
+  if (!state.sessionId) return;
+  const params = new URLSearchParams();
+  if (state.brdMarkdown) params.set("markdown", state.brdMarkdown);
+  if (state.featureName) params.set("feature_name", state.featureName);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  try {
+    const preview = await api(`/api/sessions/${state.sessionId}/brd/preview${query}`);
+    state.intendedSavePath = preview.relative;
+    $("save-path").textContent = `Will save to: ${preview.relative}`;
+  } catch (error) {
+    state.intendedSavePath = "";
+    $("save-path").textContent = "";
+    showError("chat-error", error.message);
+  }
+}
+
+async function showBrd(markdown, featureName) {
   if (state.approved) {
     hideBrd();
     return;
@@ -505,6 +657,18 @@ function showBrd(markdown, featureName) {
   $("brd-status").textContent = markdown
     ? `Draft ready${featureName ? ` — ${featureName}` : ""}`
     : "";
+
+  if (markdown) {
+    setStage("review");
+    $("chat-stage")?.classList.add("review-mode");
+    const history = $("transcript-history");
+    if (history) history.removeAttribute("open");
+    await loadBrdPreview();
+  } else {
+    $("chat-stage")?.classList.remove("review-mode");
+    state.intendedSavePath = "";
+    $("save-path").textContent = "";
+  }
 }
 
 async function consumeStream(response, bubble) {
@@ -532,14 +696,19 @@ async function consumeStream(response, bubble) {
         } else {
           setFormattedText(prompt, assembled);
         }
+        scrollTranscriptToBottom();
       }
       if (payload.done) {
         renderAssistant(bubble, assembled);
-        if (payload.brd) showBrd(payload.brd, payload.feature_name);
+        scrollTranscriptToBottom();
+        if (payload.brd) await showBrd(payload.brd, payload.feature_name);
       }
     }
   }
-  if (assembled) renderAssistant(bubble, assembled);
+  if (assembled) {
+    renderAssistant(bubble, assembled);
+    scrollTranscriptToBottom();
+  }
 }
 
 async function ensureSession(opening) {
@@ -557,11 +726,14 @@ async function ensureSession(opening) {
   });
   state.sessionId = session.id;
   state.approved = false;
+  setStage("interview");
 }
 
 async function sendChat(text, display) {
   showError("chat-error", "");
   showError("setup-error", "");
+  clearMode();
+  collapseStaleAssistantRounds();
   await ensureSession(text);
   addBubble("user", text, display);
   const bubble = addBubble("assistant", "Preparing the next round…");
@@ -577,11 +749,19 @@ async function sendChat(text, display) {
 }
 
 async function init() {
+  setStage("setup");
   const health = await api("/api/health");
   const meta = $("health-meta");
   if (meta) {
-    meta.textContent = `${health.provider} · ${health.model}` +
-      (health.api_key_configured ? "" : " · API key missing");
+    if (!health.api_key_configured) {
+      meta.hidden = false;
+      meta.className = "error banner health-meta";
+      meta.textContent =
+        "OpenRouter API key not configured — chat will fail. Set OPENROUTER_API_KEY in .env";
+    } else {
+      meta.hidden = true;
+      meta.textContent = "";
+    }
   }
   const skills = await api("/api/skills");
   renderSkills(skills.skills);
@@ -656,36 +836,46 @@ $("approve-btn").addEventListener("click", async () => {
 });
 
 $("modify-btn").addEventListener("click", () => {
-  $("chat-input").placeholder = "Describe the BRD change…";
-  $("chat-input").focus();
+  setMode("modify");
 });
 
 $("more-btn").addEventListener("click", () => {
   startNewRequirement();
 });
 
+$("mode-cancel-btn").addEventListener("click", () => {
+  clearMode();
+});
+
 async function completeApproval() {
   if (!state.sessionId) throw new Error("Start an interview before approving a BRD.");
+  const path = state.intendedSavePath || "the project docs folder";
+  if (!confirm(`Approve and save BRD to:\n${path}\n\nThis ends the current interview.`)) return;
+  clearMode();
   const saved = await saveBrd();
   const result = await api(`/api/sessions/${state.sessionId}/approve`, { method: "POST", body: "{}" });
   state.approved = true;
   state.sessionId = null;
   state.brdMarkdown = "";
   state.featureName = "";
+  state.intendedSavePath = "";
   hideBrd();
   stripBrdFromTranscript();
+  setStage("done");
   addBubble("assistant", `${result.message}\nSaved to ${result.path || saved.path}`);
 }
 
 function startNewRequirement() {
   hideBrd();
+  clearMode();
   state.sessionId = null;
   state.approved = false;
   state.brdMarkdown = "";
   state.featureName = "";
+  state.intendedSavePath = "";
+  setStage("interview");
+  setMode("add");
   addBubble("assistant", "Describe the new requirement. A separate BRD will be created for that feature.");
-  $("chat-input").placeholder = "Describe the new requirement…";
-  $("chat-input").focus();
 }
 
 init().catch((error) => showError("setup-error", error.message));

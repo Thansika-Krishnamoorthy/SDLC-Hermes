@@ -38,3 +38,18 @@ Directory browsing is limited to `BROWSE_ROOT` (defaults to your home directory)
 ```bash
 pytest
 ```
+
+API tests only. Optional mocked Playwright smoke (selectors + gallery, no OpenRouter):
+
+```bash
+playwright install chromium
+pytest -m e2e
+```
+
+## Agent UX testing
+
+The Cursor agent drives the live UI (chooses inputs and when to screenshot). Playbook: [`docs/UX-DRIVE.md`](docs/UX-DRIVE.md).
+
+- **Primary:** Browser MCP (`@Browser`) against the running app.
+- **Fallback:** `python -m tools.ux_drive start --url http://127.0.0.1:9001` then `shot` / `send` / `choose` / `state`.
+- Screenshots: `tests/artifacts/ux/<run-id>/` (gitignored). `python -m tools.ux_drive gallery add <label> --file shot.png`

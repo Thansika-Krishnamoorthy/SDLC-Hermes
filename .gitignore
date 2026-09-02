@@ -16,3 +16,6 @@ build/
 # OS / editor
 .DS_Store
 .idea/
+
+# Agent UX galleries (screenshots + INDEX.md)
+tests/artifacts/

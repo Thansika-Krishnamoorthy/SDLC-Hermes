@@ -1,0 +1,8 @@
+---
+description: Drive SDLC Skill Runner UX testing — CDP-first Browser MCP, screenshot budget, live choices
+alwaysApply: false
+---
+
+# SDLC UX drive
+
+Follow the project skill `.cursor/skills/sdlc-ux-drive/SKILL.md` (CDP-first, ~6 shots, locked `viewId`). Do not default to full `browser_snapshot` during interview. Human playbook: `docs/UX-DRIVE.md`.

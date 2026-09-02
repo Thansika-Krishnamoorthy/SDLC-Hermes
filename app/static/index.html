@@ -15,6 +15,15 @@
         </div>
       </div>
 
+      <nav id="stage-stepper" class="stage-stepper" aria-label="Workflow progress">
+        <ol>
+          <li data-stage="setup">Setup</li>
+          <li data-stage="interview">Interview</li>
+          <li data-stage="review">Review</li>
+          <li data-stage="done">Done</li>
+        </ol>
+      </nav>
+
       <div class="header-controls">
         <label class="control">
           <span>Skill</span>
@@ -49,9 +58,18 @@
       </div>
     </header>
 
-    <main class="chat-stage">
+    <p class="error banner health-meta" id="health-meta" hidden></p>
+
+    <main class="chat-stage" id="chat-stage">
       <p class="error banner" id="setup-error" hidden></p>
-      <ol id="transcript" class="transcript"></ol>
+
+      <details id="transcript-history" class="transcript-history" open>
+        <summary id="transcript-summary">Interview history (0 messages)</summary>
+        <div class="transcript-panel">
+          <ol id="transcript" class="transcript"></ol>
+        </div>
+      </details>
+
       <p class="empty" id="empty-state">Select a skill and project above, then describe the business need to start the interview.</p>
 
       <aside class="brd-card" id="brd-card" hidden>
@@ -59,14 +77,23 @@
           <h2>Business Requirements Document</h2>
           <p id="brd-status"></p>
         </div>
-        <div id="brd-preview" class="brd-preview"></div>
-        <div class="actions" id="brd-actions">
-          <button type="button" id="approve-btn">Approve BRD</button>
-          <button type="button" id="modify-btn" class="ghost">Modify BRD</button>
-          <button type="button" id="more-btn" class="ghost">Add requirements</button>
+        <div class="brd-body">
+          <div id="brd-preview" class="brd-preview"></div>
         </div>
-        <p class="path-note" id="save-path"></p>
+        <div class="brd-actions-sticky" id="brd-actions">
+          <div class="actions">
+            <button type="button" id="approve-btn">Approve BRD</button>
+            <button type="button" id="modify-btn" class="ghost">Modify BRD</button>
+            <button type="button" id="more-btn" class="ghost">Add requirements</button>
+          </div>
+          <p class="path-note" id="save-path"></p>
+        </div>
       </aside>
+
+      <div id="mode-banner" class="mode-banner" hidden>
+        <span id="mode-banner-text"></span>
+        <button type="button" id="mode-cancel-btn" class="ghost">Cancel</button>
+      </div>
 
       <form id="chat-form" class="composer">
         <input

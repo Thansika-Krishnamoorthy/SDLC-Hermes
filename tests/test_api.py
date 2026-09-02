@@ -18,8 +18,12 @@ def test_health_and_skills_endpoints():
 
     skills = client.get("/api/skills")
     assert skills.status_code == 200
-    ids = [item["id"] for item in skills.json()["skills"]]
+    payload = skills.json()["skills"]
+    ids = [item["id"] for item in payload]
     assert "business-requirement-analysis" in ids
+    bra = next(item for item in payload if item["id"] == "business-requirement-analysis")
+    assert bra["name"] == "Business Requirement Analysis"
+    assert bra["name"] != bra["id"]
 
 
 def test_index_serves_skill_and_project_dropdowns():
@@ -29,7 +33,70 @@ def test_index_serves_skill_and_project_dropdowns():
     assert 'id="skill-select"' in html
     assert 'id="project-toggle"' in html
     assert 'id="repo-list"' in html
+    assert 'id="stage-stepper"' in html
+    assert 'id="health-meta"' in html
+    assert 'id="mode-banner"' in html
+    assert 'id="transcript-history"' in html
+    assert 'class="brd-body"' in html
+    assert 'class="brd-actions-sticky"' in html
     assert "Kovan SDLC" in html
+
+
+def test_brd_preview_accepts_markdown_query(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(settings, "browse_root", tmp_path)
+    project = tmp_path / "demo-app"
+    project.mkdir()
+    started = client.post(
+        "/api/sessions",
+        json={
+            "skill_ids": ["business-requirement-analysis"],
+            "project_path": str(project),
+            "opening_message": "Need QR scanning",
+        },
+    )
+    session_id = started.json()["id"]
+    markdown = (
+        "# Business Requirements Document — QR Code Scanning\n\n"
+        "## Executive Summary\nScan codes.\n\n## Business Objectives\nSpeed up entry.\n"
+    )
+    preview = client.get(
+        f"/api/sessions/{session_id}/brd/preview",
+        params={"markdown": markdown},
+    )
+    assert preview.status_code == 200
+    assert preview.json()["filename"] == "BRD-QR-Code-Scanning.md"
+    assert not (project / "docs").exists()
+
+
+def test_brd_preview_returns_path_without_writing(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(settings, "browse_root", tmp_path)
+    project = tmp_path / "demo-app"
+    project.mkdir()
+    started = client.post(
+        "/api/sessions",
+        json={
+            "skill_ids": ["business-requirement-analysis"],
+            "project_path": str(project),
+            "opening_message": "Need visitor check-in",
+        },
+    )
+    assert started.status_code == 200
+    session_id = started.json()["id"]
+    from app.sessions import store
+
+    session = store.get(session_id)
+    session.messages.append(
+        {
+            "role": "assistant",
+            "content": "```brd\n# Business Requirements Document — Visitor Check-In\n\n## Executive Summary\nNeed faster check-in.\n\n## Business Objectives\nReduce wait time.\n```",
+        }
+    )
+    preview = client.get(f"/api/sessions/{session_id}/brd/preview")
+    assert preview.status_code == 200
+    body = preview.json()
+    assert body["filename"] == "BRD-Visitor-Check-In.md"
+    assert body["relative"] == "docs/BRD-Visitor-Check-In.md"
+    assert not (project / "docs" / body["filename"]).exists()
 
 
 def test_browse_and_create_project(tmp_path: Path, monkeypatch):

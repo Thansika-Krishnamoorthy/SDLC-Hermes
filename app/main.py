@@ -8,7 +8,13 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.brd import brd_filename, extract_brd_markdown, feature_name_from_brd, save_brd
+from app.brd import (
+    brd_filename,
+    extract_brd_markdown,
+    feature_name_from_brd,
+    preview_brd_path,
+    save_brd,
+)
 from app.config import REPO_ROOT, settings
 from app.filesystem import PathError, create_directory, list_directories, resolve_under_root
 from app.git_repos import find_git_repos
@@ -205,6 +211,39 @@ def _latest_brd(session) -> tuple[str | None, str | None]:
         if markdown:
             return markdown, feature_name_from_brd(markdown)
     return None, None
+
+
+@app.get("/api/sessions/{session_id}/brd/preview")
+def preview_brd(
+    session_id: str,
+    markdown: str | None = None,
+    feature_name: str | None = None,
+) -> dict:
+    session = store.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if markdown:
+        resolved_markdown = markdown
+        resolved_feature = feature_name or feature_name_from_brd(markdown)
+    else:
+        resolved_markdown, extracted_name = _latest_brd(session)
+        resolved_feature = feature_name or extracted_name
+    if not resolved_markdown:
+        raise HTTPException(status_code=400, detail="No BRD markdown is available.")
+    try:
+        path = preview_brd_path(
+            _root(),
+            Path(session.project_path),
+            resolved_markdown,
+            resolved_feature,
+        )
+    except PathError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "filename": path.name,
+        "relative": str(Path("docs") / path.name),
+        "absolute": str(path.resolve()),
+    }
 
 
 @app.post("/api/sessions/{session_id}/brd")
