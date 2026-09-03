@@ -13,7 +13,7 @@ Local web app that runs agent skills from `skills/` against a chosen project dir
 | `references/brd-template.md` | Required BRD sections |
 | `references/output-format.md` | Save to `<project-root>/docs/BRD-<Feature-Name>.md` |
 
-The skill text references a **grill-me** interview style. That skill is not in this repo’s `skills/` folder, so the runner follows `interview-guidelines.md` instead of a hardcoded question list.
+The skill text references a **grill-me** interview style. 
 
 ## Run
 
@@ -23,33 +23,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 # Put your OpenRouter key in .env
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
 ```
 
-Open http://127.0.0.1:8000
+Open http://127.0.0.1:8010
 
-Provider: **OpenRouter**  
-Model: **`deepseek/deepseek-v4-flash`** (override with `OPENROUTER_MODEL`)
 
 Directory browsing is limited to `BROWSE_ROOT` (defaults to your home directory).
 
-## Tests
 
-```bash
-pytest
-```
-
-API tests only. Optional mocked Playwright smoke (selectors + gallery, no OpenRouter):
-
-```bash
-playwright install chromium
-pytest -m e2e
-```
-
-## Agent UX testing
-
-The Cursor agent drives the live UI (chooses inputs and when to screenshot). Playbook: [`docs/UX-DRIVE.md`](docs/UX-DRIVE.md).
-
-- **Primary:** Browser MCP (`@Browser`) against the running app.
-- **Fallback:** `python -m tools.ux_drive start --url http://127.0.0.1:9001` then `shot` / `send` / `choose` / `state`.
-- Screenshots: `tests/artifacts/ux/<run-id>/` (gitignored). `python -m tools.ux_drive gallery add <label> --file shot.png`
